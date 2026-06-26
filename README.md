@@ -94,6 +94,9 @@ versions (e.g. `pom.xml`) remain the repo's concern (lockfiles / Renovate).
 - Plugins (code-review, commit-commands, security-guidance, context7,
   superpowers) installed best-effort, non-fatal.
 - SSH hardened to key-only; `/project` workspace + `CLAUDE.md`.
+- On the DHCP path, a netplan drop-in sets `dhcp-identifier: mac` so MAC-based
+  router reservations (e.g. Eero) are honored — Ubuntu's netplan otherwise
+  sends a DUID-based client-id that breaks them.
 
 No Node/Go/Rust/Python build stack is installed by default — added on demand.
 

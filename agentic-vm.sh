@@ -30,7 +30,7 @@
 #     the point of an agentic sandbox — but it is now sealed behind the
 #     hypervisor boundary instead of sitting on the host kernel.
 #
-# Run with:
+# Run on your Proxmox host as root:
 # curl -fsSL https://raw.githubusercontent.com/Kajoonie/HomeServer/refs/heads/main/agentic-vm.sh -o /tmp/agentic-vm.sh && bash /tmp/agentic-vm.sh
 # ============================================================================
 
@@ -527,6 +527,24 @@ log "Git defaults..."
 git config --global init.defaultBranch main
 git config --global core.editor nano
 git config --global pull.rebase false
+
+# ── DHCP: identify by MAC so router reservations work ───────────
+# Ubuntu's netplan defaults to a DUID-based DHCP client-id, which breaks
+# MAC-based reservations on many home routers. A drop-in (NOT cloud-init's own
+# file, so it survives regeneration) tells networkd to identify by MAC.
+# Only meaningful on the DHCP path; skipped for static IPs.
+if grep -qs 'dhcp4: true' /etc/netplan/50-cloud-init.yaml; then
+  log "DHCP: setting dhcp-identifier=mac (for router IP reservations)..."
+  cat > /etc/netplan/99-dhcp-identifier.yaml <<'NETPLAN'
+network:
+  version: 2
+  ethernets:
+    eth0:
+      dhcp-identifier: mac
+NETPLAN
+  chmod 600 /etc/netplan/99-dhcp-identifier.yaml
+  netplan apply 2>/dev/null || true
+fi
 
 log "Cleanup..."
 apt-get autoremove -y -qq && apt-get clean -qq
