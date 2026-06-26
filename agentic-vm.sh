@@ -196,7 +196,7 @@ build_cloudinit() {
   # The snippet storage MUST have the "snippets" content type enabled, or
   # 'qm start' later fails with an opaque error. Check early and explain.
   if ! pvesh get "/storage/${SNIPPET_STORAGE}" --output-format json 2>/dev/null \
-        | grep -q '"snippets"'; then
+        | grep -qw 'snippets'; then
     error "Storage '${SNIPPET_STORAGE}' does not have the 'snippets' content type enabled.
        Enable it in: Datacenter > Storage > ${SNIPPET_STORAGE} > Edit > Content > Snippets
        (or:  pvesm set ${SNIPPET_STORAGE} --content snippets,<existing-content-types>)"
