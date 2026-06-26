@@ -30,8 +30,8 @@
 #     the point of an agentic sandbox — but it is now sealed behind the
 #     hypervisor boundary instead of sitting on the host kernel.
 #
-# Run on your Proxmox host as root:
-#   bash agentic-vm.sh
+# Run with:
+# curl -fsSL https://raw.githubusercontent.com/Kajoonie/HomeServer/refs/heads/main/agentic-vm.sh -o /tmp/agentic-vm.sh && bash /tmp/agentic-vm.sh
 # ============================================================================
 
 set -euo pipefail
