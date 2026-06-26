@@ -195,11 +195,17 @@ build_cloudinit() {
 
   # The snippet storage MUST have the "snippets" content type enabled, or
   # 'qm start' later fails with an opaque error. Check early and explain.
-  if ! pvesh get "/storage/${SNIPPET_STORAGE}" --output-format json 2>/dev/null \
-        | grep -qw 'snippets'; then
+  # NOTE: Proxmox returns content types as one comma-joined string
+  # (e.g. "content":"iso,vztmpl,snippets"), so match 'snippets' as a word
+  # rather than as a quoted token.
+  local storage_content
+  storage_content=$(pvesh get "/storage/${SNIPPET_STORAGE}" --output-format json 2>/dev/null || true)
+  if ! grep -qw 'snippets' <<<"$storage_content"; then
     error "Storage '${SNIPPET_STORAGE}' does not have the 'snippets' content type enabled.
        Enable it in: Datacenter > Storage > ${SNIPPET_STORAGE} > Edit > Content > Snippets
-       (or:  pvesm set ${SNIPPET_STORAGE} --content snippets,<existing-content-types>)"
+       (or:  pvesm set ${SNIPPET_STORAGE} --content snippets,<existing-content-types>)
+       If you enabled snippets on a DIFFERENT storage, re-run with:
+          SNIPPET_STORAGE=<that-storage> bash agentic-vm.sh"
   fi
 
   mkdir -p "$SNIPPET_DIR"
@@ -335,6 +341,10 @@ write_provision_script() {
 #!/bin/bash
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
+# cloud-init's runcmd runs with HOME unset; under `set -u` the first $HOME
+# reference (the claude symlink step) would otherwise abort provisioning.
+# We always run as root here, so pin it.
+export HOME="${HOME:-/root}"
 
 # ── Knobs (change as you like; not "pins" — just defaults) ──────────────────
 JDK_MAJOR="26"   # OpenJDK major version (distro package openjdk-${JDK_MAJOR}-jdk)
@@ -378,6 +388,8 @@ log "Installing OpenJDK ${JDK_MAJOR} + Maven (distro packages)..."
 apt-get install -y -qq "openjdk-${JDK_MAJOR}-jdk" maven
 JAVA_HOME_PATH="/usr/lib/jvm/java-${JDK_MAJOR}-openjdk-amd64"
 # Make JAVA_HOME available to all sessions (incl. Claude's non-login shells).
+# Idempotent: drop any prior line first so re-runs don't duplicate it.
+sed -i '/^JAVA_HOME=/d' /etc/environment
 echo "JAVA_HOME=${JAVA_HOME_PATH}" >> /etc/environment
 echo "export JAVA_HOME=${JAVA_HOME_PATH}" > /etc/profile.d/java.sh
 echo "    $(java -version 2>&1 | head -1)"
@@ -492,6 +504,8 @@ systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null || true
 
 # ── Shell environment ──────────────────────────────────────────────────────
 log "Shell environment..."
+# Idempotent: only append our block if it isn't already present.
+if ! grep -q 'Agentic Claude VM' /root/.bashrc 2>/dev/null; then
 cat >> /root/.bashrc <<'BASHRC'
 
 # ── Agentic Claude VM ──────────────────────────────────────
@@ -507,6 +521,7 @@ alias dc="docker compose"
 alias dps="docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
 cd /project 2>/dev/null || true
 BASHRC
+fi
 
 log "Git defaults..."
 git config --global init.defaultBranch main
